@@ -1,8 +1,7 @@
 #+title: STT It
 #+startup: content
 
-* Usage
-** Help
+* Help
 #+begin_src sh :results pp
 sttit -h
 #+end_src
@@ -35,7 +34,9 @@ Examples:
   sttit ./video.mp4 -v -t segment
 #+end_example
 
-** Convert from URL
+
+* Examples
+** Convert audio from URL
 #+begin_src bash :results pp
 export STTIT_OPENAI_WHISPER_API_HOST="http://192.168.15.179:8000"
 export STTIT_OPENAI_WHISPER_API_MODEL="Systran/faster-whisper-tiny"
@@ -82,4 +83,36 @@ File Contents:
 {
   "text": "Hello, world."
 }
+#+end_example
+
+** Convert video from URL (verbose)
+#+begin_src bash :results pp
+export STTIT_OPENAI_WHISPER_API_HOST="http://192.168.15.179:8000"
+export STTIT_OPENAI_WHISPER_API_MODEL="Systran/faster-whisper-base"
+
+sttit https://user-images.githubusercontent.com/1991296/204038393-2f846eae-c255-4099-a76d-5735c25c49da.mp4 -v
+# Video credits: ggerganov/whisper.cpp readme
+#+end_src
+
+#+RESULTS:
+#+begin_example
+[2025-03-04 18:16:48:379] Setup: Voice Activity Detection filter is enabled by default. Use --disable-vad-filter to disable.
+[2025-03-04 18:16:48:382] Setup: Timestamp granularity is set to word by default. Use --timestamp-granulatity to change.
+[2025-03-04 18:16:48:386] Setup: Response format is set to verbose_json by default. Use --response-format to change.
+[2025-03-04 18:16:48:389] Processing input: https://user-images.githubusercontent.com/1991296/204038393-2f846eae-c255-4099-a76d-5735c25c49da.mp4
+[2025-03-04 18:16:48:391] Output file: stdout
+[2025-03-04 18:16:48:393] OpenAI Whisper API Host: http://192.168.15.179:8000
+[2025-03-04 18:16:48:395] OpenAI Whisper API Model: Systran/faster-whisper-base
+[2025-03-04 18:16:48:397] OpenAI Whisper Preferences: vad_filter=true timestamp_granularities[]=word response_format=json
+[2025-03-04 18:16:48:400] Downloading file: https://user-images.githubusercontent.com/1991296/204038393-2f846eae-c255-4099-a76d-5735c25c49da.mp4
+[2025-03-04 18:16:48:599] Downloaded file: https://user-images.githubusercontent.com/1991296/204038393-2f846eae-c255-4099-a76d-5735c25c49da.mp4 to /tmp/tmp.iTkZlv7yBu
+[2025-03-04 18:16:48:623] Extracting audio from video: /tmp/tmp.iTkZlv7yBu
+[2025-03-04 18:16:49:170] Extracted audio from video: /tmp/tmp.iTkZlv7yBu to /tmp/tmp.0K0VBbNDfJ.wav
+[2025-03-04 18:16:49:172] Sending audio to OpenAI Whisper API
+[2025-03-04 18:16:49:174] Calling: curl -s http://192.168.15.179:8000/v1/audio/transcriptions -F file=@/tmp/tmp.0K0VBbNDfJ.wav -F model=Systran/faster-whisper-base -F vad_filter=true -F timestamp_granularities[]=word -F response_format=json
+[2025-03-04 18:16:52:887] API Call took: 3709ms
+{"text":"Ok Whisper, start listening for commands. Play some music. Send a message. Turn on the lights. Turn off the lights. Call the restaurant and make a reservation. Kill all the humans. What time is it? Okay, call Jonathan on the phone. Remind me to do something important tomorrow. Good bye."}
+[2025-03-04 18:16:52:889] Cleaning up temp files
+[2025-03-04 18:16:52:892] Deleting temp file: /tmp/tmp.iTkZlv7yBu
+[2025-03-04 18:16:52:897] Deleting temp file: /tmp/tmp.0K0VBbNDfJ.wav
 #+end_example

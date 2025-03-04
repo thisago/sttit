@@ -267,8 +267,6 @@ _downloadFile() {
   fi
 
   _log "INFO" "Downloaded file: ${url} to ${filename}"
-
-  FILES_TO_DELETE_ON_EXIT+=("${filename}")
 }
 
 main() {
@@ -303,10 +301,10 @@ main() {
   if [[ "$format" != "audio/wav" ]] && [[ "$format" != "audio/x-wav" ]]; then
     TEMP_AUDIO_FILE="$(mktemp).wav"
     _log "INFO" "Extracting audio from video: ${filename}"
-    ffmpeg -i "${filename}" -vn -acodec pcm_s16le -ar 44100 -ac 2 "${TEMP_AUDIO_FILE}" > /dev/null
+    ffmpeg -i "${filename}" -vn -acodec pcm_s16le -ar 44100 -ac 2 "${TEMP_AUDIO_FILE}" &> /dev/null
     FILES_TO_DELETE_ON_EXIT+=("${TEMP_AUDIO_FILE}")
-    filename="${TEMP_AUDIO_FILE}"
     _log "INFO" "Extracted audio from video: ${filename} to ${TEMP_AUDIO_FILE}"
+    filename="${TEMP_AUDIO_FILE}"
   fi
 
   _processAudio "${filename}"
