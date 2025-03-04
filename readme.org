@@ -59,7 +59,6 @@ cat transcribed.json | jq
 rm transcribed.json
 #+end_src
 
-#+RESULTS:
 #+begin_example
 [2025-03-04 18:06:07:325] Setup: Voice Activity Detection filter is enabled by default. Use --disable-vad-filter to disable.
 [2025-03-04 18:06:07:327] Setup: Timestamp granularity is set to word by default. Use --timestamp-granulatity to change.
@@ -94,7 +93,6 @@ sttit https://user-images.githubusercontent.com/1991296/204038393-2f846eae-c255-
 # Video credits: ggerganov/whisper.cpp readme
 #+end_src
 
-#+RESULTS:
 #+begin_example
 [2025-03-04 18:16:48:379] Setup: Voice Activity Detection filter is enabled by default. Use --disable-vad-filter to disable.
 [2025-03-04 18:16:48:382] Setup: Timestamp granularity is set to word by default. Use --timestamp-granulatity to change.
