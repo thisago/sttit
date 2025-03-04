@@ -37,36 +37,48 @@ Examples:
 
 ** Convert from URL
 #+begin_src bash :results pp
-export STTIT_OPENAI_WHISPER_API_MODEL="Systran/faster-whisper-tiny"
 export STTIT_OPENAI_WHISPER_API_HOST="http://192.168.15.179:8000"
+export STTIT_OPENAI_WHISPER_API_MODEL="Systran/faster-whisper-tiny"
 
-sttit https://github.com/speaches-ai/speaches/raw/refs/heads/master/audio.wav
+sttit https://github.com/speaches-ai/speaches/raw/31537d182e79f198a6083d01495da7670d0b3e27/audio.wav
 #+end_src
+
 
 : {"text":"Hello, world."}
 
 ** Verbose mode
 #+begin_src bash :results pp
-export STTIT_OPENAI_WHISPER_API_MODEL="Systran/faster-whisper-tiny"
 export STTIT_OPENAI_WHISPER_API_HOST="http://192.168.15.179:8000"
+export STTIT_OPENAI_WHISPER_API_MODEL="Systran/faster-whisper-tiny"
 
-sttit https://github.com/speaches-ai/speaches/raw/refs/heads/master/audio.wav -v
+sttit -v https://github.com/speaches-ai/speaches/raw/31537d182e79f198a6083d01495da7670d0b3e27/audio.wav -o transcribed.json
+
+echo -e "\nFile Contents:"
+cat transcribed.json | jq
+
+rm transcribed.json
 #+end_src
 
 #+begin_example
-[2025-03-04 17:56:18:118] Setup: Voice Activity Detection filter is enabled by default. Use --disable-vad-filter to disable.
-[2025-03-04 17:56:18:120] Setup: Timestamp granularity is set to word by default. Use --timestamp-granulatity to change.
-[2025-03-04 17:56:18:123] Setup: Response format is set to verbose_json by default. Use --response-format to change.
-[2025-03-04 17:56:18:125] Processing input: https://github.com/speaches-ai/speaches/raw/refs/heads/master/audio.wav
-[2025-03-04 17:56:18:127] Output file: stdout
-[2025-03-04 17:56:18:130] OpenAI Whisper API Host: http://192.168.15.179:8000
-[2025-03-04 17:56:18:132] OpenAI Whisper API Model: Systran/faster-whisper-tiny
-[2025-03-04 17:56:18:134] OpenAI Whisper Preferences: vad_filter=true timestamp_granularities[]=word response_format=json
-[2025-03-04 17:56:18:139] Downloading file: https://github.com/speaches-ai/speaches/raw/refs/heads/master/audio.wav to /tmp/tmp.f2LWg7ro7R
-[2025-03-04 17:56:18:667] Downloaded file: https://github.com/speaches-ai/speaches/raw/refs/heads/master/audio.wav to /tmp/tmp.f2LWg7ro7R
-[2025-03-04 17:56:18:676] Sending audio to OpenAI Whisper API
-[2025-03-04 17:56:18:680] Calling: curl -s http://192.168.15.179:8000/v1/audio/transcriptions -F file=@/tmp/tmp.f2LWg7ro7R -F model=Systran/faster-whisper-tiny -F vad_filter=true -F timestamp_granularities[]=word -F response_format=json
-[2025-03-04 17:56:19:184] API Call took: 499ms
-{"text":"Hello, world."}
-[2025-03-04 17:56:19:187] Deleting temp file: /tmp/tmp.f2LWg7ro7R
+[2025-03-04 18:04:06:657] Setup: Voice Activity Detection filter is enabled by default. Use --disable-vad-filter to disable.
+[2025-03-04 18:04:06:659] Setup: Timestamp granularity is set to word by default. Use --timestamp-granulatity to change.
+[2025-03-04 18:04:06:662] Setup: Response format is set to verbose_json by default. Use --response-format to change.
+[2025-03-04 18:04:06:664] Processing input: https://github.com/speaches-ai/speaches/raw/31537d182e79f198a6083d01495da7670d0b3e27/audio.wav
+[2025-03-04 18:04:06:666] Output file: transcribed.json
+[2025-03-04 18:04:06:668] OpenAI Whisper API Host: http://192.168.15.179:8000
+[2025-03-04 18:04:06:670] OpenAI Whisper API Model: Systran/faster-whisper-tiny
+[2025-03-04 18:04:06:671] OpenAI Whisper Preferences: vad_filter=true timestamp_granularities[]=word response_format=json
+[2025-03-04 18:04:06:673] Downloading file: https://github.com/speaches-ai/speaches/raw/31537d182e79f198a6083d01495da7670d0b3e27/audio.wav
+[2025-03-04 18:04:06:769] Downloaded file: https://github.com/speaches-ai/speaches/raw/31537d182e79f198a6083d01495da7670d0b3e27/audio.wav to /tmp/tmp.Pguc35WPp2
+[2025-03-04 18:04:06:778] Sending audio to OpenAI Whisper API
+[2025-03-04 18:04:06:781] Calling: curl -s http://192.168.15.179:8000/v1/audio/transcriptions -F file=@/tmp/tmp.Pguc35WPp2 -F model=Systran/faster-whisper-tiny -F vad_filter=true -F timestamp_granularities[]=word -F response_format=json
+[2025-03-04 18:04:07:431] API Call took: 646ms
+[2025-03-04 18:04:07:434] Output written to: transcribed.json
+[2025-03-04 18:04:07:436] Deleting temp file: /tmp/tmp.Pguc35WPp2
+
+File Contents:
+{
+  "text": "Hello, world."
+}
 #+end_example
+

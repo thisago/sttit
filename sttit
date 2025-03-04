@@ -255,7 +255,7 @@ _downloadFile() {
   url="${1}"
   filename="${2}"
 
-  _log "INFO" "Downloading file: ${url} to ${filename}"
+  _log "INFO" "Downloading file: ${url}"
   curl -s -L "${url}" -o "${filename}"
   _log "INFO" "Downloaded file: ${url} to ${filename}"
 }
