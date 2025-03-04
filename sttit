@@ -199,10 +199,13 @@ _parseArgs() {
 }
 
 _cleanup() {
+  _log "INFO" "Cleaning up temp files"
   for FILE in "${FILES_TO_DELETE_ON_EXIT[@]}"; do
     if [ -f "${FILE}" ]; then
       _log "INFO" "Deleting temp file: ${FILE}"
       rm -f "${FILE}"
+    else
+      _log "INFO" "File does not exist: ${FILE}"
     fi
   done
 }
@@ -257,7 +260,15 @@ _downloadFile() {
 
   _log "INFO" "Downloading file: ${url}"
   curl -s -L "${url}" -o "${filename}"
+
+  if [ ! -f "${filename}" ]; then
+    _log "ERROR" "Failed to download file: ${url}"
+    exit 1
+  fi
+
   _log "INFO" "Downloaded file: ${url} to ${filename}"
+
+  FILES_TO_DELETE_ON_EXIT+=("${filename}")
 }
 
 main() {
