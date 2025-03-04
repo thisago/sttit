@@ -1,0 +1,75 @@
+#+title: STT It
+#+startup: content
+
+* Usage
+** Help
+#+begin_src sh :results pp
+sttit -h
+#+end_src
+
+#+RESULTS:
+#+begin_example
+sttit - Speak To Text Videos and Files
+
+Using OpenAI-compatible API, generate Whisper-powered JSON transcript from audio from files or contained in a video.
+Supported formats: All ffmpeg-supported formats.
+
+Change the OpenAI Compatible API host and key with the following envs:
+- STTIT_OPENAI_WHISPER_API_HOST
+- STTIT_OPENAI_WHISPER_API_KEY (optional)
+- STTIT_OPENAI_WHISPER_API_MODEL (optional)
+
+Usage:
+  sttit [options] filename
+
+Arguments:
+  --help, -h: Show help
+  --verbose, -v: Enable verbose mode
+  --disable-vad-filter, -d: Disable Voice Activity Detection filter (enabled by default)
+  --timestamp-granulatity, -t: Timestamp granularity (default: word)
+  --response-format, -r: Response format (default: json)
+  --output, -o: Output file
+  filename: File to process
+
+Examples:
+  sttit ./audio.mp3
+  sttit ./video.mp4 -v -t segment
+#+end_example
+
+** Convert from URL
+#+begin_src bash :results pp
+export STTIT_OPENAI_WHISPER_API_MODEL="Systran/faster-whisper-tiny"
+export STTIT_OPENAI_WHISPER_API_HOST="http://192.168.15.179:8000"
+
+sttit https://github.com/speaches-ai/speaches/raw/refs/heads/master/audio.wav
+#+end_src
+
+#+RESULTS:
+: {"text":"Hello, world."}
+
+** Verbose mode
+#+begin_src bash :results pp
+export STTIT_OPENAI_WHISPER_API_MODEL="Systran/faster-whisper-tiny"
+export STTIT_OPENAI_WHISPER_API_HOST="http://192.168.15.179:8000"
+
+sttit https://github.com/speaches-ai/speaches/raw/refs/heads/master/audio.wav -v
+#+end_src
+
+#+RESULTS:
+#+begin_example
+[2025-03-04 17:56:18:118] Setup: Voice Activity Detection filter is enabled by default. Use --disable-vad-filter to disable.
+[2025-03-04 17:56:18:120] Setup: Timestamp granularity is set to word by default. Use --timestamp-granulatity to change.
+[2025-03-04 17:56:18:123] Setup: Response format is set to verbose_json by default. Use --response-format to change.
+[2025-03-04 17:56:18:125] Processing input: https://github.com/speaches-ai/speaches/raw/refs/heads/master/audio.wav
+[2025-03-04 17:56:18:127] Output file: stdout
+[2025-03-04 17:56:18:130] OpenAI Whisper API Host: http://192.168.15.179:8000
+[2025-03-04 17:56:18:132] OpenAI Whisper API Model: Systran/faster-whisper-tiny
+[2025-03-04 17:56:18:134] OpenAI Whisper Preferences: vad_filter=true timestamp_granularities[]=word response_format=json
+[2025-03-04 17:56:18:139] Downloading file: https://github.com/speaches-ai/speaches/raw/refs/heads/master/audio.wav to /tmp/tmp.f2LWg7ro7R
+[2025-03-04 17:56:18:667] Downloaded file: https://github.com/speaches-ai/speaches/raw/refs/heads/master/audio.wav to /tmp/tmp.f2LWg7ro7R
+[2025-03-04 17:56:18:676] Sending audio to OpenAI Whisper API
+[2025-03-04 17:56:18:680] Calling: curl -s http://192.168.15.179:8000/v1/audio/transcriptions -F file=@/tmp/tmp.f2LWg7ro7R -F model=Systran/faster-whisper-tiny -F vad_filter=true -F timestamp_granularities[]=word -F response_format=json
+[2025-03-04 17:56:19:184] API Call took: 499ms
+{"text":"Hello, world."}
+[2025-03-04 17:56:19:187] Deleting temp file: /tmp/tmp.f2LWg7ro7R
+#+end_example

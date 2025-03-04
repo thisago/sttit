@@ -1,0 +1,313 @@
+#!/usr/bin/env bash
+
+HELP_APP_NAME="sttit"
+HELP_ABOUT="Speak To Text Videos and Files"
+HELP_DESCRIPTION="Using OpenAI-compatible API, generate Whisper-powered JSON transcript from audio from files or contained in a video.
+Supported formats: All ffmpeg-supported formats.
+
+Change the OpenAI Compatible API host and key with the following envs:
+- STTIT_OPENAI_WHISPER_API_HOST
+- STTIT_OPENAI_WHISPER_API_KEY (optional)
+- STTIT_OPENAI_WHISPER_API_MODEL (optional)"
+HELP_ARGUMENTS="
+  --help, -h: Show help
+  --verbose, -v: Enable verbose mode
+  --disable-vad-filter, -d: Disable Voice Activity Detection filter (enabled by default)
+  --timestamp-granulatity, -t: Timestamp granularity (default: word)
+  --response-format, -r: Response format (default: json)
+  --output, -o: Output file
+  filename: File to process (supports url)"
+HELP_USAGE="${HELP_APP_NAME} [options] filename"
+HELP_EXAMPLES=(
+  "sttit ./audio.mp3"
+  "sttit ./video.mp4 -v -t segment"
+)
+
+REQUIRED_COMMANDS=(
+  "ffmpeg"
+  "jq"
+  "curl"
+)
+
+VERBOSE_MODE=false
+
+FILES_TO_DELETE_ON_EXIT=()
+
+OPENAI_WHISPER_API_CALL_PARAMETERS=()
+
+FILENAME_TO_PROCESS=""
+
+OUTPUT_FILE=""
+
+OPENAI_WHISPER_API_CALL_RESPONSE=""
+
+
+_showHelp() {
+  echo -e "${HELP_APP_NAME} - ${HELP_ABOUT}"
+  echo -e ""
+  echo -e "${HELP_DESCRIPTION}"
+  echo -e ""
+  echo -e "Usage:"
+  echo -e "  ${HELP_USAGE}"
+  echo -e ""
+  echo -en "Arguments:"
+  echo -e "${HELP_ARGUMENTS}"
+  echo -e ""
+  echo -e "Examples:"
+  for EXAMPLE in "${HELP_EXAMPLES[@]}"; do
+    echo -e "  ${EXAMPLE}"
+  done
+}
+
+_log() {
+  level="${1}"
+  shift
+  message="${@}"
+
+  timestamp=$(date +"%Y-%m-%d %H:%M:%S:%3N")
+  if [ "${VERBOSE_MODE}" = true ]; then
+    echo -n "[${timestamp}] "
+  fi
+
+  case ${level} in
+  "ERROR")
+    echo "$message" >&2
+    ;;
+  "INFO")
+    if [ "${VERBOSE_MODE}" = true ]; then
+      echo "$message"
+    fi
+    ;;
+  *)
+    echo "Unknown log level: ${level}" >&2
+    exit 1
+    ;;
+  esac
+}
+_checkCommands() {
+  for COMMAND in "${REQUIRED_COMMANDS[@]}"; do
+    if ! command -v "${COMMAND}" &> /dev/null; then
+      _log "ERROR" "Command '${COMMAND}' is required to run this script. Please install '${COMMAND}'."
+      exit 1
+    fi
+  done
+}
+
+_checkEnvs() {
+  # Check if OpenAI API Host is set
+  if [ -z "${STTIT_OPENAI_WHISPER_API_HOST}" ]; then
+    _log "ERROR" "STTIT_OPENAI_WHISPER_API_HOST is not set. Please set the OpenAI API Host."
+    exit 1
+  fi
+}
+
+_parseArgs() {
+  while [ "${#}" -gt 0 ]; do
+    case "${1}" in
+    --help | -h)
+      _showHelp
+      exit 0
+      ;;
+    --verbose | -v)
+      VERBOSE_MODE=true
+      ;;
+    --disable-vad-filter | -d)
+      OPENAI_WHISPER_API_CALL_PARAMETERS+=("vad_filter=false")
+      ;;
+    --timestamp-granulatity | -t)
+      ALLOWED_TIMESTAMP_GRANULATITY=("segment" "word")
+      if [ -z "${2}" ]; then
+        _log "ERROR" "--timestamp-granulatity requires a value."
+        exit 1
+      fi
+      if [[ ! " ${ALLOWED_TIMESTAMP_GRANULATITY[@]} " =~ " ${2} " ]]; then
+        _log "ERROR" "--timestamp-granulatity must be one of the following: ${ALLOWED_TIMESTAMP_GRANULATITY[@]}"
+        exit 1
+      fi
+
+      OPENAI_WHISPER_API_CALL_PARAMETERS+=("timestamp_granularities[]=${2}")
+      shift
+      ;;
+    --response-format | -r)
+      ALLOWED_RESPONSE_FORMAT=("json" "text" "srt" "verbose_json" "vtt")
+      if [ -z "${2}" ]; then
+        _log "ERROR" "--response-format requires a value."
+        exit 1
+      fi
+      if [[ ! " ${ALLOWED_RESPONSE_FORMAT[@]} " =~ " ${2} " ]]; then
+        _log "ERROR" "--response-format must be one of the following: ${ALLOWED_RESPONSE_FORMAT[@]}"
+        exit 1
+      fi
+
+      OPENAI_WHISPER_API_CALL_PARAMETERS+=("response_format=${2}")
+      shift
+      ;;
+    --output | -o)
+      if [ -z "${2}" ]; then
+        _log "ERROR" "--output requires a value."
+        exit 1
+      fi
+      # Check if output file is writable
+      if [ -f "${2}" ] && [ ! -w "${2}" ]; then
+        _log "ERROR" "Output file is not writable: ${2}"
+        exit 1
+      fi
+      # Check if output file is a directory
+      if [ -d "${2}" ]; then
+        _log "ERROR" "Output file is a directory: ${2}"
+        exit 1
+      fi
+
+      OUTPUT_FILE="${2}"
+      shift
+      ;;
+    *)
+        if [ -z "${FILENAME_TO_PROCESS}" ]; then
+          FILENAME_TO_PROCESS="${1}"
+        else
+          _log "ERROR" "Unknown argument: ${1}"
+          exit 1
+        fi
+      ;;
+    esac
+    shift
+  done
+
+  if [ -z "${FILENAME_TO_PROCESS}" ]; then
+    _log "ERROR" "Filename is required."
+    exit 1
+  fi
+
+  # Default values
+  if [[ ! " ${OPENAI_WHISPER_API_CALL_PARAMETERS[@]} " =~ " vad_filter=false " ]]; then
+    _log "INFO" "Setup: Voice Activity Detection filter is enabled by default. Use --disable-vad-filter to disable."
+    OPENAI_WHISPER_API_CALL_PARAMETERS+=("vad_filter=true")
+  fi
+  if [[ ! " ${OPENAI_WHISPER_API_CALL_PARAMETERS[@]} " =~ " timestamp_granularities[]=word " ]] &&
+     [[ ! " ${OPENAI_WHISPER_API_CALL_PARAMETERS[@]} " =~ " timestamp_granularities[]=segment " ]]; then
+    _log "INFO" "Setup: Timestamp granularity is set to word by default. Use --timestamp-granulatity to change."
+    OPENAI_WHISPER_API_CALL_PARAMETERS+=("timestamp_granularities[]=word")
+  fi
+  if [[ ! " ${OPENAI_WHISPER_API_CALL_PARAMETERS[@]} " =~ " response_format=verbose_json " ]] &&
+     [[ ! " ${OPENAI_WHISPER_API_CALL_PARAMETERS[@]} " =~ " response_format=json " ]] &&
+     [[ ! " ${OPENAI_WHISPER_API_CALL_PARAMETERS[@]} " =~ " response_format=text " ]] &&
+     [[ ! " ${OPENAI_WHISPER_API_CALL_PARAMETERS[@]} " =~ " response_format=srt " ]] &&
+     [[ ! " ${OPENAI_WHISPER_API_CALL_PARAMETERS[@]} " =~ " response_format=vtt " ]]; then
+    _log "INFO" "Setup: Response format is set to verbose_json by default. Use --response-format to change."
+    OPENAI_WHISPER_API_CALL_PARAMETERS+=("response_format=json")
+  fi
+}
+
+_cleanup() {
+  for FILE in "${FILES_TO_DELETE_ON_EXIT[@]}"; do
+    if [ -f "${FILE}" ]; then
+      _log "INFO" "Deleting temp file: ${FILE}"
+      rm -f "${FILE}"
+    fi
+  done
+}
+
+_processAudio() {
+  url="${STTIT_OPENAI_WHISPER_API_HOST}/v1/audio/transcriptions"
+  filename="${1}"
+
+  rawHeaders=()
+  if [ -n "${STTIT_OPENAI_WHISPER_API_KEY}" ]; then
+    headers+=("Authorization: Bearer ${STTIT_OPENAI_WHISPER_API_KEY}")
+  fi
+
+  rawMultipartData=(
+    "file=@${filename}"
+  )
+  if [ -n "${STTIT_OPENAI_WHISPER_API_MODEL}" ]; then
+    rawMultipartData+=("model=${STTIT_OPENAI_WHISPER_API_MODEL}")
+  fi
+
+  for PARAM in "${OPENAI_WHISPER_API_CALL_PARAMETERS[@]}"; do
+    rawMultipartData+=("${PARAM}")
+  done
+
+  _log "INFO" "Sending audio to OpenAI Whisper API"
+
+  headers=()
+  for header in "${rawHeaders[@]}"; do
+    headers+=(-H "${header}")
+  done
+
+  multipartData=()
+  for data in ${rawMultipartData[@]}; do
+    multipartData+=(-F "${data}")
+  done
+
+  command="curl -s "${url}" ${multipartData[@]} ${headers[@]}"
+  _log "INFO" "Calling: ${command}"
+
+  timeStart=$(date +%s%3N)
+  response=$(${command})
+  timeEnd=$(date +%s%3N)
+
+  _log "INFO" "API Call took: $((timeEnd - timeStart))ms"
+
+  OPENAI_WHISPER_API_CALL_RESPONSE="${response}"
+}
+
+_downloadFile() {
+  url="${1}"
+  filename="${2}"
+
+  _log "INFO" "Downloading file: ${url} to ${filename}"
+  curl -s -L "${url}" -o "${filename}"
+  _log "INFO" "Downloaded file: ${url} to ${filename}"
+}
+
+main() {
+  _parseArgs "${@}"
+  _log "INFO" "Processing input: ${FILENAME_TO_PROCESS}"
+  _log "INFO" "Output file: ${OUTPUT_FILE:-stdout}"
+
+  _checkCommands
+  _checkEnvs
+
+  _log "INFO" "OpenAI Whisper API Host: ${STTIT_OPENAI_WHISPER_API_HOST}"
+  _log "INFO" "OpenAI Whisper API Model: ${STTIT_OPENAI_WHISPER_API_MODEL}"
+  _log "INFO" "OpenAI Whisper Preferences: ${OPENAI_WHISPER_API_CALL_PARAMETERS[@]}"
+
+  # Check if file is a URL
+  if [[ "${FILENAME_TO_PROCESS}" == http* ]]; then
+    TEMP_FILE="$(mktemp)"
+    _downloadFile "${FILENAME_TO_PROCESS}" "${TEMP_FILE}"
+    FILES_TO_DELETE_ON_EXIT+=("${TEMP_FILE}")
+    FILENAME_TO_PROCESS="${TEMP_FILE}"
+  fi
+
+  # Check if file exists
+  if [ ! -f "${FILENAME_TO_PROCESS}" ]; then
+    _log "INFO" "File does not exist: ${FILENAME_TO_PROCESS}" "ERROR"
+    exit 1
+  fi
+  filename="$(realpath "${FILENAME_TO_PROCESS}")"
+
+  # Check if file needs audio extraction
+  format="$(file --mime-type -b "${filename}")"
+  if [[ "$format" != "audio/wav" ]] && [[ "$format" != "audio/x-wav" ]]; then
+    TEMP_AUDIO_FILE="$(mktemp).wav"
+    _log "INFO" "Extracting audio from video: ${filename}"
+    ffmpeg -i "${filename}" -vn -acodec pcm_s16le -ar 44100 -ac 2 "${TEMP_AUDIO_FILE}" > /dev/null
+    FILES_TO_DELETE_ON_EXIT+=("${TEMP_AUDIO_FILE}")
+    filename="${TEMP_AUDIO_FILE}"
+    _log "INFO" "Extracted audio from video: ${filename} to ${TEMP_AUDIO_FILE}"
+  fi
+
+  _processAudio "${filename}"
+
+  if [ -n "${OUTPUT_FILE}" ]; then
+    echo "${OPENAI_WHISPER_API_CALL_RESPONSE}" > "${OUTPUT_FILE}"
+    _log "INFO" "Output written to: ${OUTPUT_FILE}"
+  else
+    echo "${OPENAI_WHISPER_API_CALL_RESPONSE}"
+  fi
+
+  # Clean up temp files
+  _cleanup
+}
+main "${@}"
